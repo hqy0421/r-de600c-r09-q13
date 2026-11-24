@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Docs
+docs/_build/
+docs/notebooks/
+docs/development.md
+
+# Testing
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# uv
+uv.lock
+
+setup-patterns.md
+ARCHITECTURE.md
+# Local perf/analysis + planning docs (not part of the published package)
+CH_AS_ENTRY_PLAN.md
+COLOCATION_ANALYSIS.md
+CONCURRENT_PLAN.md
+READ_PATH_ANALYSIS.md
+WRITE_PATH_ANALYSIS.md
+ROUNDTRIP_COLLAPSE.md
+SINGLE_ROUNDTRIP_PLAN.md
+.claude/
+
+benchmarks/
+benchmark_argmax_vs_limit1by/
+
+# Local engineering notes (perf scratch, etc.)
+notes/
+
+# Local visual inspector tool (standalone, not part of the published package)
+inspect/
+# Snapshot of the pre-WASM server-backed inspector, kept as a reference/fallback.
+inspect_legacy/
