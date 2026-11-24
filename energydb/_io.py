@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import importlib.metadata
+import inspect
 import logging
 import os
 import re
@@ -21,7 +23,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 import polars as pl
 import psycopg
-from timedb import RELATIVE_READ_COLUMNS, PgEngineMeta, UnchangedScope, empty_frame, profiling, read_columns
+from timedb import RELATIVE_READ_COLUMNS, PgEngineMeta, TimeDBClient, UnchangedScope, empty_frame, profiling, read_columns
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -62,6 +64,13 @@ _ROUTING_AND_META_COLS = (
 # Their joint presence marks an edge-routed manifest before edge_uuid is
 # attached. edge_name never routes on its own, so it plays no part here.
 _EDGE_TRIPLE_COLS = ("from_path", "to_path", "edge_type")
+
+# The pinned timedb (0.12.0) predates the bucket_us / bucket_dedup downsampling
+# kwargs on TimeDBClient.read. Detect support once instead of crashing every
+# read with an unexpected-kwarg TypeError; an explicit bucket_us request on an
+# unsupported timedb raises a clear ValidationError instead of being silently
+# ignored.
+_TD_READ_SUPPORTS_BUCKET = "bucket_us" in inspect.signature(TimeDBClient.read).parameters
 
 
 class WriteResult(int):
@@ -651,20 +660,25 @@ async def execute_read(
     elif is_edge is None:
         raise ValidationError("execute_read requires is_edge when resolve= is given.")
 
-    kwargs = (
-        dict(td_kwargs or {})
-        if relative
-        else {
+    if relative:
+        kwargs: dict = dict(td_kwargs or {})
+    else:
+        kwargs = {
             "start_valid": start_valid,
             "end_valid": end_valid,
             "start_known": start_known,
             "end_known": end_known,
             "include_updates": include_updates,
-            "bucket_us": bucket_us,
-            "bucket_dedup": bucket_dedup,
             "include_knowledge_time": include_knowledge_time,
         }
-    )
+        if _TD_READ_SUPPORTS_BUCKET:
+            kwargs["bucket_us"] = bucket_us
+            kwargs["bucket_dedup"] = bucket_dedup
+        elif bucket_us is not None:
+            raise ValidationError(
+                "bucket_us downsampling is not supported by the installed timedb "
+                f"(timedb=={importlib.metadata.version('timedb')}); upgrade timedb to use it."
+            )
 
     missing = pl.DataFrame()
 

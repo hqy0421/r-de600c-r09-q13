@@ -52,6 +52,7 @@ from energydb._ch_meta_engine import (
     engine_table_ddl,
     inlines_pg_password,
 )
+from energydb._correct import CorrectionResult, correct_manifest
 from energydb._frames import Backend, Output, to_backend, to_polars
 from energydb._io import (
     ReadResult,
@@ -1023,6 +1024,72 @@ class AsyncClient:
             run_params=run_params,
             skip_unchanged=skip_unchanged,
             unchanged_scope=unchanged_scope,
+        )
+
+    async def correct(
+        self,
+        df: pl.DataFrame | pd.DataFrame,
+        *,
+        reason: str,
+        changed_by: str,
+        knowledge_time: datetime | None = None,
+        run_id: int | None = None,
+        workflow_id: str | None = None,
+        model_name: str | None = None,
+        run_start_time: datetime | None = None,
+        run_finish_time: datetime | None = None,
+        run_params: dict | None = None,
+    ) -> CorrectionResult:
+        """Correct published actual readings via a routing manifest.
+
+        The explicit revision entry point for quality corrections: each
+        ``(series, valid_time)`` in the manifest must already hold a
+        published value, which the correction replaces as the latest
+        readable version while the old version stays in storage. The write
+        carries its audit payload on every row — ``reason`` as the
+        annotation, ``changed_by`` as the author — and one
+        ``knowledge_time`` (default: now) marking when the correction
+        entered the knowledge window.
+
+        The two read contracts then fall out of the knowledge-window
+        selectors on :meth:`read`:
+
+        * latest results include the correction immediately (default read);
+        * a report generated before the correction reproduces exactly with
+          ``end_known=<correction knowledge_time>``.
+
+        The replaced ("superseded") versions — the original records'
+        identity — are captured at correction time: returned on
+        ``CorrectionResult.superseded`` and frozen (capped) into the run's
+        ``run_params["correction"]`` alongside the reason.
+
+        Raises:
+
+        * :class:`~energydb.errors.CorrectionTargetError` — an addressed
+          ``(series, valid_time)`` has no published value (use
+          :meth:`write` for a first publish);
+        * :class:`~energydb.errors.ValidationError` — missing ``reason`` /
+          ``changed_by``, an OVERLAPPING series in the manifest (those are
+          versioned by republication), duplicate ``(series, valid_time)``
+          rows, or a ``knowledge_time`` that does not move past the
+          superseded versions (the correction would never surface in
+          latest reads).
+        """
+        with profiling._phase(profiling.PHASE_EDB_OUTPUT_CONVERT):
+            df_pl = to_polars(df)
+        return await correct_manifest(
+            self,
+            self.td,
+            df_pl,
+            reason=reason,
+            changed_by=changed_by,
+            knowledge_time=knowledge_time,
+            run_id=run_id,
+            workflow_id=workflow_id,
+            model_name=model_name,
+            run_start_time=run_start_time,
+            run_finish_time=run_finish_time,
+            run_params=run_params,
         )
 
     async def read(

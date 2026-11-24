@@ -33,6 +33,7 @@ from timedb import read as timedb_read
 
 from energydb import series as series_mod
 from energydb._ch_meta_engine import CH_ENGINE_TABLE
+from energydb._correct import CorrectionResult
 from energydb._frames import Backend, Output, to_backend, to_polars
 from energydb._io import WriteResult, annotate_undefined_table, execute_read
 from energydb._join import EdgeSeriesKey, SeriesKey
@@ -531,6 +532,79 @@ class _BaseScope:
             run_params=run_params,
             skip_unchanged=skip_unchanged,
             unchanged_scope=unchanged_scope,
+        )
+
+    async def correct(
+        self,
+        df: pl.DataFrame | pd.DataFrame,
+        *,
+        data_type: str,
+        name: str,
+        reason: str,
+        changed_by: str,
+        unit: str | None = None,
+        knowledge_time: datetime | None = None,
+        run_id: int | None = None,
+        workflow_id: str | None = None,
+        model_name: str | None = None,
+        run_start_time: datetime | None = None,
+        run_finish_time: datetime | None = None,
+        run_params: dict | None = None,
+    ) -> CorrectionResult:
+        """Correct published actual readings on this scope's owner.
+
+        The quality-correction entry point for a single series: every
+        ``valid_time`` in ``df`` must already hold a published value. The
+        correction becomes the latest readable version immediately, while
+        the superseded version stays in storage — historical reports reproduce
+        under the pre-revision basis with
+        ``read(..., end_known=<correction knowledge_time>)``.
+
+        ``reason`` (the business justification) and ``changed_by`` (the
+        author) are mandatory and stored on every corrected row; the
+        replaced versions' identity comes back on
+        ``CorrectionResult.superseded`` and is frozen into the run's
+        ``run_params["correction"]``. See :meth:`AsyncClient.correct
+        <energydb.AsyncClient.correct>` for the full contract.
+
+        >>> scope.correct(
+        ...     pd.DataFrame({"valid_time": [ts], "value": [2.61]}),
+        ...     data_type="actual", name="power",
+        ...     reason="Meter recalibration after CT ratio audit (QE-114)",
+        ...     changed_by="qa:jane.doe",
+        ... )
+        """
+        if self._txn is not None:
+            _ts_io_unsupported_in_txn("correct")
+        route = self._write_route()
+        if route is not None:
+            owner_col, owner_val = route
+        else:
+            async with self._use_conn() as conn:
+                owner_val = await self._resolve_uuid(conn)
+            owner_col = self._owner_col
+        with profiling._phase(profiling.PHASE_EDB_OUTPUT_CONVERT):
+            df_pl = to_polars(df)
+        with profiling._phase(profiling.PHASE_EDB_MANIFEST_BUILD):
+            manifest = _attach_routing(
+                df_pl,
+                owner_col=owner_col,
+                owner_val=owner_val,
+                data_type=data_type,
+                name=name,
+                unit=unit,
+            )
+        return await self._client.correct(
+            manifest,
+            reason=reason,
+            changed_by=changed_by,
+            knowledge_time=knowledge_time,
+            run_id=run_id,
+            workflow_id=workflow_id,
+            model_name=model_name,
+            run_start_time=run_start_time,
+            run_finish_time=run_finish_time,
+            run_params=run_params,
         )
 
     async def read(

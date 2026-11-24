@@ -701,6 +701,46 @@ one. ``unchanged_scope`` selects the comparison key accordingly:
    there is a real publication time to compare against — never a per-batch
    ``now()`` stamp.
 
+Correcting published actuals
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When quality staff need to fix an already-published actual reading, use
+:meth:`NodeScope.correct <energydb.NodeScope.correct>` /
+:meth:`EdgeScope.correct <energydb.EdgeScope.correct>` (single series) or
+:meth:`client.correct <energydb.AsyncClient.correct>` (bulk manifest) —
+the audited revision entry point, rather than a bare re-``write()``. Every
+corrected ``(series, valid_time)`` must already hold a published value;
+correcting a never-published reading raises
+:class:`~energydb.errors.CorrectionTargetError` (a first publish belongs on
+``write()``).
+
+The correction becomes the latest readable version immediately, while the
+superseded version stays in storage — so current results include the fix,
+and a historical report still reproduces under the pre-revision basis by
+bounding the knowledge window with ``end_known``:
+
+.. code-block:: python
+
+   result = client.get_node("my-portfolio", "Offshore-1", "T01").correct(
+       pd.DataFrame({"valid_time": [ts], "value": [2.61]}),
+       data_type="actual", name="power",
+       reason="Meter recalibration after CT ratio audit (QE-114)",
+       changed_by="qa:jane.doe",
+   )
+   kt = result.superseded  # the replaced version(s), captured at write time
+
+   scope.read(data_type="actual", name="power")                    # sees 2.61
+   scope.read(data_type="actual", name="power", end_known=cutoff)  # sees the old value
+
+``reason`` (the business justification) and ``changed_by`` (the author) are
+mandatory and stored on every corrected row; one ``knowledge_time``
+(default: now) marks when the correction entered the knowledge window. The
+returned :class:`~energydb.CorrectionResult` carries the superseded
+versions — the original records' identity and old values — and the same
+detail is frozen into the run's ``run_params["correction"]`` for audit.
+Corrections are restricted to ``FLAT`` series: an ``OVERLAPPING`` series is
+versioned by republication through ``write()``, not corrected in place.
+
 Reading
 ~~~~~~~
 

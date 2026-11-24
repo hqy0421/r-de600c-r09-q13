@@ -116,6 +116,27 @@ class AlreadyExistsError(EnergyDBError, ValueError):
     """
 
 
+class CorrectionTargetError(NotFoundError):
+    """A correction addressed a ``(series, valid_time)`` with no published value.
+
+    Corrections revise an *existing* published reading; a first publish goes
+    through ``write()``. ``missing`` carries every addressed pair that
+    resolved to a registered series but had no stored value: the manifest's
+    routing identity followed by ``(data_type, name, valid_time)``, mirroring
+    :class:`SeriesNotFoundError`'s convention with the reading's valid_time
+    appended (ISO string).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        missing: Sequence[tuple[str, ...]] | None = None,
+    ):
+        super().__init__(message)
+        self.missing: list[tuple[str, ...]] | None = None if missing is None else list(missing)
+
+
 class ValidationError(EnergyDBError, ValueError):
     """Invalid arguments or an invalid operation.
 
@@ -220,6 +241,7 @@ __all__ = [
     "AlreadyExistsError",
     "AmbiguousEdgeError",
     "ConfigurationError",
+    "CorrectionTargetError",
     "EdgeNotFoundError",
     "EnergyDBError",
     "IncompatibleUnitError",

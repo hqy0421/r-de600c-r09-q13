@@ -67,6 +67,7 @@ from timedatamodel import (  # noqa: E402
     TimeSeriesType,
 )
 
+from energydb._correct import CorrectionResult  # noqa: E402
 from energydb._io import ReadResult, WriteResult  # noqa: E402
 from energydb._join import EdgeSeriesKey, SeriesKey, find  # noqa: E402
 from energydb._sync import Client  # noqa: E402
@@ -77,6 +78,7 @@ from energydb.errors import (  # noqa: E402
     AlreadyExistsError,
     AmbiguousEdgeError,
     ConfigurationError,
+    CorrectionTargetError,
     EdgeNotFoundError,
     EnergyDBError,
     ManifestError,
@@ -99,6 +101,7 @@ __all__ = [
     "Transaction",
     "ReadResult",
     "WriteResult",
+    "CorrectionResult",
     # By-path result keys
     "SeriesKey",
     "EdgeSeriesKey",
@@ -115,6 +118,7 @@ __all__ = [
     "NodeNotFoundError",
     "EdgeNotFoundError",
     "SeriesNotFoundError",
+    "CorrectionTargetError",
     "AlreadyExistsError",
     "AmbiguousEdgeError",
     "ValidationError",

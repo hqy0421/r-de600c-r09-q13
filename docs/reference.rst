@@ -51,6 +51,15 @@ Returned by :meth:`Client.write <energydb.AsyncClient.write>`,
    :members:
    :show-inheritance:
 
+Returned by :meth:`Client.correct <energydb.AsyncClient.correct>` and the
+scope ``correct()`` methods. Subclasses :class:`WriteResult` and adds
+``superseded``: the replaced versions (original record identity and old
+values), captured at correction time.
+
+.. autoclass:: energydb.CorrectionResult
+   :members:
+   :show-inheritance:
+
 Returned by :meth:`Client.read <energydb.AsyncClient.read>` /
 :meth:`Client.read_relative <energydb.AsyncClient.read_relative>` **only** when
 ``on_missing="skip"`` is passed; the default returns the data bare.
@@ -171,6 +180,10 @@ root. See :ref:`the SDK error-handling guide <sdk-error-handling>` for usage.
    :show-inheritance:
 
 .. autoexception:: energydb.errors.SeriesNotFoundError
+   :members:
+   :show-inheritance:
+
+.. autoexception:: energydb.errors.CorrectionTargetError
    :members:
    :show-inheritance:
 
